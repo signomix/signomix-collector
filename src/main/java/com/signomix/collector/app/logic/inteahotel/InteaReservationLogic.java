@@ -4,7 +4,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Map;
 
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.rest.client.RestClientBuilder;
@@ -261,8 +260,8 @@ public class InteaReservationLogic {
             if (logger.isDebugEnabled()) {
                 logger.debug("Room " + roomId + " status: " + roomDataDto.status);
             }
-            // save status to database
-            saveRoomReservationStatus(roomPrefix, roomId, roomDataDto.status, timestamp);
+            // save status to database - NOT USED
+            // saveRoomReservationStatus(roomPrefix, roomId, roomDataDto.status, timestamp);
             // create event - DISABLED
             createRoomDataEvent(roomPrefix, roomId, roomDataDto.status, timestamp);
         }
