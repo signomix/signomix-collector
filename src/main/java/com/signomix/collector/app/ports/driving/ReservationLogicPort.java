@@ -42,7 +42,7 @@ public class ReservationLogicPort {
                 break;
         }
     }
-    
+
     public void synchronizeReservations(Map<String, String> parameters) {
         String provider = parameters.get("provider");
         if (provider == null || provider.isEmpty()) {
@@ -57,7 +57,7 @@ public class ReservationLogicPort {
                 logger.warn("Unknown provider: " + provider);
                 break;
         }
-        
+
     }
 
     public void updateReservations(Map<String, String> parameters) {
@@ -74,7 +74,7 @@ public class ReservationLogicPort {
                 logger.warn("Unknown provider: " + provider);
                 break;
         }
-        
+
     }
 
     public void updateStatuses(Map<String, String> parameters) {
@@ -91,10 +91,10 @@ public class ReservationLogicPort {
                 logger.warn("Unknown provider: " + provider);
                 break;
         }
-        
+
     }
-    
-    private Map<String,String> getParametersMap(String[] parts) {
+
+    private Map<String, String> getParametersMap(String[] parts) {
         Map<String, String> parameters = new HashMap<>();
         for (String part : parts) {
             String[] keyValue = part.split("=");
