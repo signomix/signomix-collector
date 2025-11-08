@@ -2,8 +2,6 @@ package com.signomix.collector.app.logic.simulator;
 
 import org.jboss.logging.Logger;
 
-import com.signomix.collector.adapters.driven.SimulatorConfigDao;
-
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -13,8 +11,8 @@ public class SimulatorLogic {
     @Inject
     Logger logger;
 
-    @Inject
-    SimulatorConfigDao simulatorConfigDao;
+    //@Inject
+    //SimulatorConfigDao simulatorConfigDao;
 
 
     public void runContinuousSimulation(String source, String target, String apiKey, String fromDate, String toDate,

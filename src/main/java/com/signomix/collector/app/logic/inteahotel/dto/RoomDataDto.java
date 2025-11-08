@@ -4,4 +4,5 @@ public class RoomDataDto {
     public int room;
     public int status;
     public String number;
+    public String arrivalDate;
 }

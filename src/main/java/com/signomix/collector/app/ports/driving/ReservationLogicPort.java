@@ -91,7 +91,6 @@ public class ReservationLogicPort {
                 logger.warn("Unknown provider: " + provider);
                 break;
         }
-
     }
 
     private Map<String, String> getParametersMap(String[] parts) {

@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.signomix</groupId>
     <artifactId>collector</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.0</version>
 
     <properties>
         <compiler-plugin.version>3.13.0</compiler-plugin.version>
@@ -85,11 +85,16 @@
         <dependency>
             <groupId>com.signomix</groupId>
             <artifactId>signomix-common</artifactId>
-            <version>1.43.6</version>
+            <version>1.43.14</version>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-messaging-mqtt</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>6.0.0</version>
         </dependency>
     </dependencies>
     <build>

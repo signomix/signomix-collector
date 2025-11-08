@@ -2,7 +2,9 @@ package com.signomix.collector.app.logic.inteahotel;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
@@ -52,19 +54,27 @@ public class InteaReservationLogic {
     @RestClient
     SignomixReceiverClient signomixReceiverClient;
 
-    /* @RestClient
-    InteahotelReservationClient inteahotelReservationClient; */
+    /*
+     * @RestClient
+     * InteahotelReservationClient inteahotelReservationClient;
+     */
 
-    /* @ConfigProperty(name = "room.prefix")
-    String roomPrefix;
-    @ConfigProperty(name = "room.key")
-    String roomKey;
-    @ConfigProperty(name = "sync.device.eui")
-    String syncDeviceEui;
-    @ConfigProperty(name = "sync.device.key")
-    String syncDeviceAuthKey;
-    @ConfigProperty(name = "room.group")
-    String roomGroup; */
+    /*
+     * @ConfigProperty(name = "room.prefix")
+     * String roomPrefix;
+     *
+     * @ConfigProperty(name = "room.key")
+     * String roomKey;
+     *
+     * @ConfigProperty(name = "sync.device.eui")
+     * String syncDeviceEui;
+     *
+     * @ConfigProperty(name = "sync.device.key")
+     * String syncDeviceAuthKey;
+     *
+     * @ConfigProperty(name = "room.group")
+     * String roomGroup;
+     */
 
     StatusDatabaseAdapter getStatusDatabaseAdapter() {
         if (null == statusDatabaseAdapter) {
@@ -86,9 +96,9 @@ public class InteaReservationLogic {
         if (logger.isDebugEnabled()) {
             logger.debug("Getting status for room " + roomId);
         }
-        String eui = getRoomEuiFromNumber(roomId, roomPrefix);
+        List<String> euis = getRoomEuiFromNumber(roomId, roomPrefix);
         try {
-            return getStatusDatabaseAdapter().getRoomReservationStatus(eui);
+            return getStatusDatabaseAdapter().getRoomReservationStatus(euis.get(0));
         } catch (Exception e) {
             e.printStackTrace();
             logger.error("Error getting status for room " + roomId);
@@ -98,64 +108,127 @@ public class InteaReservationLogic {
 
     /**
      * Set room reservation status
-     * 
+     *
      * @param roomId
      * @param status
      * @param timestamp
      */
-    public void saveRoomReservationStatus(String roomPrefix, Integer roomId, Integer status, long timestamp) {
-        String eui = getRoomEuiFromNumber(roomId, roomPrefix);
-        try {
-            getStatusDatabaseAdapter().setRoomReservationStatus(eui, status, timestamp);
-        } catch (Exception e) {
-            e.printStackTrace();
-            logger.error("Error setting status for room " + roomId + " to " + status);
-        }
-        if (logger.isDebugEnabled()) {
-            logger.debug("Setting status for room " + roomId + " to " + status);
-        }
+    public void saveRoomReservationStatus(
+            String roomPrefix,
+            Integer roomId,
+            Integer status,
+            long timestamp) {
+        List<String> euis = getRoomEuiFromNumber(roomId, roomPrefix);
+        euis.forEach(eui -> {
+            try {
+                getStatusDatabaseAdapter().setRoomReservationStatus(
+                        eui,
+                        status,
+                        timestamp);
+            } catch (Exception e) {
+                e.printStackTrace();
+                logger.error(
+                        "Error setting status for room " + roomId + " to " + status);
+            }
+            if (logger.isDebugEnabled()) {
+                logger.debug("Setting status for room " + roomId + " to " + status);
+            }
+        });
     }
 
     /**
      * Create room status event
-     * 
+     *
      * @param roomId
      * @param status
      * @param timestamp
      */
-    public void createRoomDataEvent(String roomPrefix, Integer roomId, Integer status, long timestamp) {
-        String eui = getRoomEuiFromNumber(roomId, roomPrefix);
-        // send data to MQTT
-        String timestampStr = Long.toString(timestamp);
-        StringBuffer sb = new StringBuffer();
-        sb.append("eui=");
-        sb.append(eui);
-        sb.append(";");
-        sb.append("status=");
-        sb.append(status);
-        sb.append(";");
-        sb.append("timestamp=");
-        sb.append(timestampStr);
-        dataEmitter.send(sb.toString());
+    public void createRoomDataEvent(
+            String roomPrefix,
+            Integer roomId,
+            Integer status,
+            String arrivalDate,
+            long timestamp) {
+        // Long arrival = 0L;
+        AtomicLong arrival = new AtomicLong(0L);
+        // String eui = getRoomEuiFromNumber(roomId, roomPrefix);
+        ArrayList<String> euis = getRoomEuiFromNumber(roomId, roomPrefix);
+        // arrivalDate is in format YYYY-MM-DD in Europe/Warsaw timezone
+        // must be converted to timestamp as epoch milliseconds
+        try {
+            if (arrivalDate != null && !arrivalDate.isEmpty()) {
+                String[] parts = arrivalDate.split("-");
+                if (parts.length == 3) {
+                    int year = Integer.parseInt(parts[0]);
+                    int month = Integer.parseInt(parts[1]);
+                    int day = Integer.parseInt(parts[2]);
+                    java.time.LocalDate localDate = java.time.LocalDate.of(
+                            year,
+                            month,
+                            day);
+                    java.time.ZonedDateTime zonedDateTime = localDate.atStartOfDay(
+                            java.time.ZoneId.of("Europe/Warsaw"));
+                    arrival.set(zonedDateTime.toInstant().toEpochMilli());
+                    // arrival = zonedDateTime.toInstant().toEpochMilli();
+                }
+            }
+        } catch (Exception e) {
+            logger.warn(
+                    "Error parsing arrival date: " +
+                            arrivalDate +
+                            " - " +
+                            e.getMessage());
+        }
+
+        // for earch eui in euis send data to MQTT
+        euis.forEach(eui -> {
+            String timestampStr = Long.toString(timestamp);
+            StringBuffer sb = new StringBuffer();
+            sb.append("eui=");
+            sb.append(eui);
+            sb.append(";");
+            sb.append("status=");
+            sb.append(status);
+            sb.append(";");
+            sb.append("arrival=");
+            sb.append(arrival);
+            sb.append(";");
+            sb.append("timestamp=");
+            sb.append(timestampStr);
+            dataEmitter.send(sb.toString());
+        });
     }
 
     /**
      * Create EUI from room ID
-     * 
+     *
      * @param roomId
      * @return
      */
-    public String getRoomEuiFromNumber(Integer roomId, String roomPrefix) {
+    // public String getRoomEuiFromNumber(Integer roomId, String roomPrefix) {
+    // // transform roomId to String containing number prepended by 0s to have 3
+    // digits
+    // String roomIdStr = String.format("%03d", roomId);
+    // return (roomPrefix + roomIdStr);
+    // }
+    public ArrayList<String> getRoomEuiFromNumber(Integer roomId, String roomPrefix) {
         // transform roomId to String containing number prepended by 0s to have 3 digits
         String roomIdStr = String.format("%03d", roomId);
-        String eui = roomPrefix + roomIdStr;
-        return eui;
+        ArrayList<String> euis = new ArrayList<>();
+        euis.add(roomPrefix + roomIdStr);
+        // pokoje 401,402,403 mają EUI z suffixem S
+        if (roomId >= 401 && roomId <= 403) {
+            euis.add(roomPrefix + roomIdStr + "S");
+        }
+        return euis;
     }
 
     /**
      * Synchronize reservations
      */
-    public void synchronizeReservations(boolean updatedOnly, Map<String, String> parameters) {
+    public void synchronizeReservations(
+            boolean updatedOnly,
+            Map<String, String> parameters) {
         logger.debug("Synchronizing reservations");
         String token;
         String user = parameters.get("user");
@@ -165,19 +238,28 @@ public class InteaReservationLogic {
             logger.error("Reservation service URL not provided");
             return;
         }
-        if (user == null || password == null || user.isEmpty() || password.isEmpty()) {
+        if (user == null ||
+                password == null ||
+                user.isEmpty() ||
+                password.isEmpty()) {
             logger.error("Credentials for reservation service not provided");
             return;
         }
         String syncDeviceEui = parameters.get("sync.device.eui");
         String syncDeviceAuthKey = parameters.get("sync.device.key");
-        if (syncDeviceEui == null || syncDeviceAuthKey == null || syncDeviceEui.isEmpty() || syncDeviceAuthKey.isEmpty()) {
+        if (syncDeviceEui == null ||
+                syncDeviceAuthKey == null ||
+                syncDeviceEui.isEmpty() ||
+                syncDeviceAuthKey.isEmpty()) {
             logger.error("Sync device EUI or auth key not provided");
             return;
         }
         String roomPrefix = parameters.get("room.prefix");
         String roomKey = parameters.get("room.key");
-        if (roomPrefix == null || roomKey == null || roomPrefix.isEmpty() || roomKey.isEmpty()) {
+        if (roomPrefix == null ||
+                roomKey == null ||
+                roomPrefix.isEmpty() ||
+                roomKey.isEmpty()) {
             logger.error("Room prefix or key not provided");
             return;
         }
@@ -189,12 +271,18 @@ public class InteaReservationLogic {
         try {
             response = client.login(new CredentialsDto(user, password));
             if (response.getStatus() != 200) {
-                ErrorMessageDto errorMessage = response.readEntity(ErrorMessageDto.class);
-                logger.error("Error logging in to reservation service: " + errorMessage.code + " - "
-                        + errorMessage.message);
-                signomixReceiverClient.sendSynchronizationStatus(syncDeviceAuthKey,
-                        syncDeviceEui, 1, errorMessage.code + " - "
-                                + errorMessage.message);
+                ErrorMessageDto errorMessage = response.readEntity(
+                        ErrorMessageDto.class);
+                logger.error(
+                        "Error logging in to reservation service: " +
+                                errorMessage.code +
+                                " - " +
+                                errorMessage.message);
+                signomixReceiverClient.sendSynchronizationStatus(
+                        syncDeviceAuthKey,
+                        syncDeviceEui,
+                        1,
+                        errorMessage.code + " - " + errorMessage.message);
                 return;
             } else {
                 TokenDto tokenDto = response.readEntity(TokenDto.class);
@@ -202,9 +290,13 @@ public class InteaReservationLogic {
                 logger.debug("Logged in to reservation service");
             }
         } catch (Exception e) {
-            logger.error("Error logging in to reservation service: " + e.getMessage());
-            signomixReceiverClient.sendSynchronizationStatus(syncDeviceAuthKey,
-                    syncDeviceEui, 1, e.getMessage());
+            logger.error(
+                    "Error logging in to reservation service: " + e.getMessage());
+            signomixReceiverClient.sendSynchronizationStatus(
+                    syncDeviceAuthKey,
+                    syncDeviceEui,
+                    1,
+                    e.getMessage());
             return;
         }
 
@@ -216,57 +308,92 @@ public class InteaReservationLogic {
                 response = client.getRoomStatuses("Bearer " + token);
             }
             if (response.getStatus() != 200) {
-                ErrorMessageDto errorMessage = response.readEntity(ErrorMessageDto.class);
-                logger.error("Error getting room statuses: " + errorMessage.code + " - " + errorMessage.message);
+                ErrorMessageDto errorMessage = response.readEntity(
+                        ErrorMessageDto.class);
+                logger.error(
+                        "Error getting room statuses: " +
+                                errorMessage.code +
+                                " - " +
+                                errorMessage.message);
                 return;
             } else {
-                roomStatusResponse = response.readEntity(RoomStatusResponse.class);
+                roomStatusResponse = response.readEntity(
+                        RoomStatusResponse.class);
                 if (logger.isDebugEnabled()) {
-                    logger.debug("Got room statuses: " + roomStatusResponse.created_at);
-                    logger.debug("Last status check: " + roomStatusResponse.last_status_check);
-                    logger.debug("Room statuses: " + roomStatusResponse.data.size() + " rooms");
+                    logger.debug(
+                            "Got room statuses: " + roomStatusResponse.created_at);
+                    logger.debug(
+                            "Last status check: " +
+                                    roomStatusResponse.last_status_check);
+                    logger.debug(
+                            "Room statuses: " +
+                                    roomStatusResponse.data.size() +
+                                    " rooms");
                 }
             }
         } catch (Exception e) {
             logger.error("Error getting room statuses: " + e.getMessage());
-            signomixReceiverClient.sendSynchronizationStatus(syncDeviceAuthKey,
-                    syncDeviceEui, 1, e.getMessage());
+            signomixReceiverClient.sendSynchronizationStatus(
+                    syncDeviceAuthKey,
+                    syncDeviceEui,
+                    1,
+                    e.getMessage());
             return;
         }
         if (roomStatusResponse == null || roomStatusResponse.data == null) {
             logger.error("Error getting room statuses: data list null");
-            signomixReceiverClient.sendSynchronizationStatus(syncDeviceAuthKey,
-                    syncDeviceEui, 1, "brak listy danych");
+            signomixReceiverClient.sendSynchronizationStatus(
+                    syncDeviceAuthKey,
+                    syncDeviceEui,
+                    1,
+                    "brak listy danych");
             return;
         } else if (roomStatusResponse.data.size() == 0 && !updatedOnly) {
             logger.error("Error getting room statuses: data list empty");
-            signomixReceiverClient.sendSynchronizationStatus(syncDeviceAuthKey,
-                    syncDeviceEui, 1, "brak danych");
+            signomixReceiverClient.sendSynchronizationStatus(
+                    syncDeviceAuthKey,
+                    syncDeviceEui,
+                    1,
+                    "brak danych");
             return;
         }
         RoomDataDto roomDataDto = null;
         int roomId;
         long timestamp = System.currentTimeMillis();
-        logger.info("Got room statuses: " + roomStatusResponse.data.size() + " rooms");
+        logger.info(
+                "Got room statuses: " + roomStatusResponse.data.size() + " rooms");
         for (int i = 0; i < roomStatusResponse.data.size(); i++) {
             roomDataDto = roomStatusResponse.data.get(i);
-            //roomId = transformRoomId(roomDataDto.room);
-            try{
+            // roomId = transformRoomId(roomDataDto.room);
+            try {
                 roomId = Integer.parseInt(roomDataDto.number);
             } catch (Exception e) {
-                logger.error("Error transforming room ID: " + roomDataDto.room + " - " + e.getMessage());
+                logger.error(
+                        "Error transforming room ID: " +
+                                roomDataDto.room +
+                                " - " +
+                                e.getMessage());
                 continue; // skip this room if transformation fails
             }
             if (logger.isDebugEnabled()) {
-                logger.debug("Room " + roomId + " status: " + roomDataDto.status);
+                logger.debug(
+                        "Room " + roomId + " status: " + roomDataDto.status);
             }
             // save status to database - NOT USED
             // saveRoomReservationStatus(roomPrefix, roomId, roomDataDto.status, timestamp);
             // create event - DISABLED
-            createRoomDataEvent(roomPrefix, roomId, roomDataDto.status, timestamp);
+            createRoomDataEvent(
+                    roomPrefix,
+                    roomId,
+                    roomDataDto.status,
+                    roomDataDto.arrivalDate,
+                    timestamp);
         }
-        signomixReceiverClient.sendSynchronizationStatus(syncDeviceAuthKey,
-                syncDeviceEui, 0, "");
+        signomixReceiverClient.sendSynchronizationStatus(
+                syncDeviceAuthKey,
+                syncDeviceEui,
+                0,
+                "");
     }
 
     /**
@@ -276,13 +403,17 @@ public class InteaReservationLogic {
         logger.info("Updating room statuses");
         String roomGroup = parameters.get("room.group");
         String roomKey = parameters.get("room.key");
-        if (roomGroup == null || roomKey == null || roomGroup.isEmpty() || roomKey.isEmpty()) {
+        if (roomGroup == null ||
+                roomKey == null ||
+                roomGroup.isEmpty() ||
+                roomKey.isEmpty()) {
             logger.error("Room group or key not provided");
             return;
         }
         ArrayList<Device> roomDevices = new ArrayList<>();
         try {
-            roomDevices = (ArrayList) getIotDatabaseDao().getGroupDevices(roomGroup);
+            roomDevices = (ArrayList) getIotDatabaseDao().getGroupDevices(
+                    roomGroup);
         } catch (IotDatabaseException e) {
             logger.error("Error getting devices from database");
             e.printStackTrace();
@@ -297,12 +428,11 @@ public class InteaReservationLogic {
 
     /**
      * Transform Inteahotel room ID to the hotel room ID
-     * 
+     *
      * @param roomId room Id used in the Inteahotel system
      * @return room Id used in the hotel system or -1 if not found
      */
     private int transformRoomId(int roomId) {
         return roomMapper.getRoomMapping().getOrDefault(roomId, -1);
     }
-
 }

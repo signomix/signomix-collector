@@ -3,10 +3,16 @@ package com.signomix.collector.app.logic.inteahotel.dto;
 public class ReservationDto {
     public Integer roomId;
     public Integer status;
+    public String arrivalDate;
 
     public ReservationDto() {
     }
 
+    public ReservationDto(Integer roomId, Integer status, String arrivalDate) {
+        this.roomId = roomId;
+        this.status = status;
+        this.arrivalDate = arrivalDate;
+    }
     public ReservationDto(Integer roomId, Integer status) {
         this.roomId = roomId;
         this.status = status;

@@ -82,7 +82,7 @@ public class ForReservationsAdapter {
         try {
             long timestamp = System.currentTimeMillis();
             reservationLogic.saveRoomReservationStatus(roomPrefix, reservation.roomId, reservation.status, timestamp);
-            reservationLogic.createRoomDataEvent(roomPrefix, reservation.roomId, reservation.status, timestamp);
+            reservationLogic.createRoomDataEvent(roomPrefix, reservation.roomId, reservation.status, reservation.arrivalDate, timestamp);
             return "OK";
         } catch (Exception e) {
             logger.error("Error setting status for room " + reservation.roomId + " to " + reservation.status);
