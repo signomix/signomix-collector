@@ -12,15 +12,15 @@ import redis.clients.jedis.Jedis;
 @ApplicationScoped
 public class TwinLogic {
 
-     static final int HEADER_SIZE=8;
+    static final int HEADER_SIZE = 9;
 
     @Inject
     Logger logger;
 
-    @ConfigProperty(name = "signomix.twin.organization.id") 
+    @ConfigProperty(name = "signomix.twin.organization.id")
     Long twinOrganizationId;
 
-    @ConfigProperty(name = "signomix.twin.device.eui.prefix") 
+    @ConfigProperty(name = "signomix.twin.device.eui.prefix")
     String twinDeviceEuiPrefix;
 
     private static Jedis jedis;
@@ -32,30 +32,30 @@ public class TwinLogic {
                 return;
             }
             String deviceEUI = dataParts[0];
-            String organizationStr= dataParts[1];
+            String organizationStr = dataParts[1];
             String name = dataParts[2];
             String statusStr = dataParts[3];
             String alertStatusStr = dataParts[4];
             String latitudeStr = dataParts[5];
             String longitudeStr = dataParts[6];
             String altitudeStr = dataParts[7];
-            String timestampStr= dataParts[8];
+            String timestampStr = dataParts[8];
             long organization;
             long timestamp;
-            try{
+            try {
                 organization = Long.parseLong(organizationStr);
             } catch (NumberFormatException e) {
                 logger.warn("Invalid number format: " + e.getMessage());
                 return;
             }
-            try{
+            try {
                 timestamp = Long.parseLong(timestampStr);
             } catch (NumberFormatException e) {
                 logger.warn("Invalid number format: " + e.getMessage());
                 return;
             }
-            if(organization!=twinOrganizationId || !deviceEUI.startsWith(twinDeviceEuiPrefix)){
-                logger.warn("Data key not supported: " + organization + ":" + deviceEUI  );
+            if (organization != twinOrganizationId || !deviceEUI.startsWith(twinDeviceEuiPrefix)) {
+                logger.warn("Data key not supported: " + organization + ":" + deviceEUI);
                 return;
             }
 
@@ -72,16 +72,12 @@ public class TwinLogic {
 
             for (int i = HEADER_SIZE; i < dataParts.length; i++) {
                 String[] keyValue = dataParts[i].split("=");
-                if (keyValue.length == 2) {
-                    try {
-                        dataMap.put(keyValue[0], keyValue[1]);
-                    } catch (NumberFormatException nfe) {
-                        logger.warn("Invalid number format for key: " + keyValue[0]);
-                    }
+                if (keyValue.length == 2 && !keyValue[1].equalsIgnoreCase("null")) {
+                    dataMap.put(keyValue[0], keyValue[1]);
                 }
             }
             logger.info("Handling twin data: " + dataMap.toString());
-            saveToRedis(deviceEUI, organization, timestamp  , dataMap);
+            saveToRedis(deviceEUI, organization, timestamp, dataMap);
         } catch (Exception e) {
             logger.error("Error processing twin data: " + e.getMessage());
         }
@@ -93,10 +89,11 @@ public class TwinLogic {
         }
         return jedis;
     }
+
     private void saveToRedis(String deviceEUI, long organization, long timestamp, HashMap<String, String> dataMap) {
         try {
             Jedis jedis = getJedis();
-            String redisKey=""+organization+":"+deviceEUI;
+            String redisKey = "" + organization + ":" + deviceEUI;
             jedis.hmset(redisKey, dataMap);
         } catch (Exception e) {
             logger.error("Error saving to Redis: " + e.getMessage());
