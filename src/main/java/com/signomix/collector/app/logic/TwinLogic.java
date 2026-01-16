@@ -28,7 +28,7 @@ public class TwinLogic {
 
     public void processData(String[] dataParts) {
         try {
-            if (dataParts.length < 2) {
+            if (dataParts.length < HEADER_SIZE) {
                 logger.warn("Insufficient data parts received.");
                 return;
             }
@@ -78,7 +78,6 @@ public class TwinLogic {
                 }
             }
             logger.info("Handling twin data: " + dataMap.toString());
-            //saveToRedis(deviceEUI, organization, timestamp, dataMap);
             saveToRedisTransaction(deviceEUI, organization, dataMap);
         } catch (Exception e) {
             logger.error("Error processing twin data: " + e.getMessage());
